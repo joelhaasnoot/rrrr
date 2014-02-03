@@ -3,7 +3,7 @@
 /* util.c : various utility functions */
 #include "util.h"
 
-#include <syslog.h>
+/*#include <syslog.h>*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +12,7 @@
 
 void die(const char *msg) {
     fprintf (stderr, "%s\n", msg);
-    syslog (LOG_ERR, "%s\n", msg);
+    //syslog (LOG_ERR, "%s\n", msg);
     exit (EXIT_FAILURE);
 }
 
@@ -21,7 +21,7 @@ static char buf[32];
 // buffer should always be at least 13 characters long, including terminating null
 char *btimetext(rtime_t rt, char *buf) {
     if (rt == UNREACHED) {
-        strcpy(buf, "   --   ");
+        strcpy_s(buf, 8, "   --   ");
         return buf;
     }
     char *day;

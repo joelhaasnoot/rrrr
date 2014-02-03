@@ -7,7 +7,9 @@
 #include "geometry.h"
 #include "util.h"
 #include "radixtree.h"
+#ifdef REALTIME
 #include "gtfs-realtime.pb-c.h"
+#endif
 
 #include <stddef.h>
 
@@ -111,7 +113,9 @@ struct tdata {
     char *stop_ids;
     uint32_t trip_id_width;
     char *trip_ids;
-    TransitRealtime__FeedMessage *alerts;
+#ifdef REALTIME
+	TransitRealtime__FeedMessage *alerts;
+#endif
 };
 
 void tdata_load(char* filename, tdata_t*);

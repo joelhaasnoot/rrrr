@@ -30,7 +30,7 @@ BitSet *bitset_new(uint32_t capacity) {
     return bs;
 }
 
-static inline void index_check(BitSet *self, uint32_t index) {
+static __inline void index_check(BitSet *self, uint32_t index) {
     if (index >= self->capacity) {
         printf("bitset index %d out of range [0, %d)\n", index, self->capacity);
         exit(1);    
@@ -89,7 +89,7 @@ void bitset_destroy(BitSet *self) {
   Return the next set index in this BitSet greater than or equal to the specified index.
   Returns BITSET_NONE if there are no more set bits. 
 */
-inline uint32_t bitset_next_set_bit(BitSet *bs, uint32_t index) {
+__inline uint32_t bitset_next_set_bit(BitSet *bs, uint32_t index) {
     uint64_t *chunk = bs->chunks + (index >> 6);  // 2^6 == 64
     uint64_t mask = 1ull << (index & 0x3F);       // binary 111111, i.e. the six lowest-order bits 
     while (index < bs->capacity) {
