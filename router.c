@@ -305,6 +305,7 @@ bool router_route(router_t *router, router_request_t *req) {
     // router_request_dump(router, preq);
     uint32_t n_stops = router->tdata->n_stops;
     router->day_mask = req->day_mask;
+	router_state_t *states;
     
     /* One serviceday_t for each of: yesterday, today, tomorrow (for overnight searches) */
     /* Note that yesterday's bit flag will be 0 if today is the first day of the calendar. */
@@ -345,13 +346,14 @@ bool router_route(router_t *router, router_request_t *req) {
     
     I printf("Initializing router state \n");
     // Router state is a C99 dynamically dimensioned array of size [RRRR_MAX_ROUNDS][n_stops]
-    router_state_t (*states)[n_stops] = (router_state_t(*)[]) router->states; 
+    //router_state_t (*states)[n_stops] = (router_state_t(*)[]) router->states; 
+	states = router->states;
     for (uint32_t round = 0; round < RRRR_MAX_ROUNDS; ++round) {
         for (uint32_t stop = 0; stop < n_stops; ++stop) {
             // We use the time fields to record when stops have been reached. 
             // When times are UNREACHED the other fields in the same state should never be read.
-            states[round][stop].time = UNREACHED;
-            states[round][stop].walk_time = UNREACHED;
+            states[(round * n_stops) + stop].time = UNREACHED;
+			states[(round * n_stops) + stop].walk_time = UNREACHED;
             /*
             states[round][stop].back_stop = NONE;
             states[round][stop].back_route = NONE;
@@ -410,8 +412,8 @@ bool router_route(router_t *router, router_request_t *req) {
             /* Initialize origin state */
             router->origin = prev_stop; // only origin is used from here on in routing
             router->best_time[router->origin]   = prev_stop_time;
-            states[1][router->origin].time      = prev_stop_time;
-            states[1][router->origin].walk_time = prev_stop_time; 
+			states[(1 * n_stops) + router->origin].time = prev_stop_time;
+			states[(1 * n_stops) + router->origin].walk_time = prev_stop_time;
             /* When starting on board, only flag one route and do not apply transfers, only a single walk. */
             bitset_reset (router->updated_stops);
             bitset_reset (router->updated_routes);
@@ -423,15 +425,15 @@ bool router_route(router_t *router, router_request_t *req) {
     if (req->from != ONBOARD) {
         /* We will use round 1 to hold the initial state for round 0. Round 1 must then be re-initialized before use. */
         router->best_time[router->origin] = req->time;
-        states[1][router->origin].time   = req->time;
+        states[(1 * n_stops) + router->origin].time   = req->time;
         // the rest of these should be unnecessary
-        states[1][router->origin].back_stop  = NONE;
-        states[1][router->origin].back_route = NONE;
-        states[1][router->origin].back_trip  = NONE;
-        states[1][router->origin].board_time = UNREACHED;
+        states[(1 * n_stops) + router->origin].back_stop  = NONE;
+		states[(1 * n_stops) + router->origin].back_route = NONE;
+		states[(1 * n_stops) + router->origin].back_trip = NONE;
+		states[(1 * n_stops) + router->origin].board_time = UNREACHED;
         /* Hack to communicate the origin time to itinerary renderer. It would be better to just include rtime_t in request structs. */
         // TODO eliminate this now that we have rtimes in requests
-        states[0][router->origin].time = req->time;
+        states[0 + router->origin].time = req->time;
         bitset_reset(router->updated_stops);
         // This is inefficient, as it depends on iterating over a bitset with only one bit true.
         bitset_set(router->updated_stops, router->origin);
@@ -457,7 +459,7 @@ bool router_route(router_t *router, router_request_t *req) {
 void router_round(router_t *router, router_request_t *req, uint8_t round) {
     // TODO restrict pointers?
     uint32_t n_stops = router->tdata->n_stops;
-    router_state_t (*states)[n_stops] = (router_state_t(*)[]) router->states;
+    router_state_t (*states) = (router_state_t(*)[]) router->states;
     uint8_t last_round = (round == 0) ? 1 : round - 1;
 
     I printf("round %d\n", round);
@@ -514,7 +516,7 @@ void router_round(router_t *router, router_request_t *req, uint8_t round) {
                 this route at this location, indicate that we want to search for a trip.
             */
             bool attempt_board = false;
-            rtime_t prev_time = states[last_round][stop].walk_time;
+            rtime_t prev_time = states[(last_round * n_stops) + stop].walk_time;
             if (prev_time != UNREACHED) { // Only board at placed that have been reached.
                 if (trip == NONE || req->via == stop) {
                     attempt_board = true;
@@ -636,11 +638,11 @@ void router_round(router_t *router, router_request_t *req, uint8_t round) {
                 } else { // TODO should alighting handled here? if ((route_stop_attributes[route_stop] & rsa_alighting) == rsa_alighting)
                     I printf("    setting stop to %s \n", timetext(time)); 
                     router->best_time[stop] = time;
-                    states[round][stop].time = time;
-                    states[round][stop].back_route = route_idx; 
-                    states[round][stop].back_trip  = trip; 
-                    states[round][stop].back_stop  = board_stop;
-                    states[round][stop].board_time = board_time;
+					states[(round * n_stops) + stop].time = time;
+					states[(round * n_stops) + stop].back_route = route_idx;
+					states[(round * n_stops) + stop].back_trip = trip;
+					states[(round * n_stops) + stop].back_stop = board_stop;
+					states[(round * n_stops) + stop].board_time = board_time;
                     if (req->arrive_by) {
                         if (board_time < time) printf ("board time non-decreasing\n");
                     } else {
@@ -764,7 +766,7 @@ static bool check_plan_invariants (struct plan *plan) {
 void router_result_to_plan (struct plan *plan, router_t *router, router_request_t *req) {
     uint32_t n_stops = router->tdata->n_stops;
     /* Router states are a 2D array of stride n_stops */
-    router_state_t (*states)[n_stops] = (router_state_t(*)[]) router->states;
+    router_state_t (*states) = (router_state_t(*)[]) router->states;
     plan->n_itineraries = 0;
     plan->req = *req; // copy the request into the plan for use in rendering
     struct itinerary *itin = plan->itineraries;
@@ -773,7 +775,7 @@ void router_result_to_plan (struct plan *plan, router_t *router, router_request_
         /* Work backward from the target to the origin */
         uint32_t stop = (req->arrive_by ? req->from : req->to);
         /* skip rounds that were not reached */
-        if (states[n_xfers][stop].walk_time == UNREACHED) continue;
+		if (states[(n_xfers * n_stops) + stop].walk_time == UNREACHED) continue;
         itin->n_rides = n_xfers + 1;
         itin->n_legs = itin->n_rides * 2 + 1; // always same number of legs for same number of transfers
         struct leg *l = itin->legs; // the slot in which record a leg, reversing them for forward trips
@@ -786,7 +788,7 @@ void router_result_to_plan (struct plan *plan, router_t *router, router_request_
             }
                         
             /* Walk phase */
-            router_state_t *walk = &(states[round][stop]);
+            router_state_t *walk = &(states[(round * n_stops) + stop]);
             if (walk->walk_time == UNREACHED) {
                 printf ("ERROR: stop %d was unreached by walking.\n", stop);
                 break;
@@ -795,7 +797,7 @@ void router_result_to_plan (struct plan *plan, router_t *router, router_request_
             stop = walk->walk_from;  /* follow the chain of states backward */
 
             /* Ride phase */
-            router_state_t *ride = &(states[round][stop]);
+            router_state_t *ride = &(states[(round * n_stops) + stop]);
             if (ride->time == UNREACHED) {
                 printf ("ERROR: stop %d was unreached by riding.\n", stop);
                 break;
@@ -834,12 +836,12 @@ void router_result_to_plan (struct plan *plan, router_t *router, router_request_
             l->t0 = req->time;
         } else {
             /* The initial walk leg leading out of the search origin. This is inferred, not stored explicitly. */ 
-            router_state_t *final_walk = &(states[0][stop]);
+            router_state_t *final_walk = &(states[0 + stop]);
             uint32_t origin_stop = (req->arrive_by ? req->to : req->from);
             l->s0 = origin_stop;
             l->s1 = stop;
             /* It would also be possible to work from s1 to s0 and compress out the wait time. */
-            l->t0 = states[0][origin_stop].time;
+            l->t0 = states[0 + origin_stop].time;
             rtime_t duration = transfer_duration (router->tdata, req, l->s0, l->s1);
             l->t1 = l->t0 + (req->arrive_by ? -duration : +duration);
             l->route = WALK;
@@ -854,7 +856,7 @@ void router_result_to_plan (struct plan *plan, router_t *router, router_request_
 }
 
 static __inline char *plan_render_itinerary (struct itinerary *itin, tdata_t *tdata, char *b, char *b_end) {
-    b += sprintf (b, "\nITIN %d rides \n", itin->n_rides);
+    b += sprintf_s (b, sizeof(b), "\nITIN %d rides \n", itin->n_rides);
 
     /* Render the legs of this itinerary, which are in chronological order */
     for (struct leg *leg = itin->legs; leg < itin->legs + itin->n_legs; ++leg) {
@@ -916,7 +918,7 @@ static __inline char *plan_render_itinerary (struct itinerary *itin, tdata_t *td
         }
 #endif
 
-        b += sprintf (b, "%s %5d %3d %5d %5d %s %s %+3.1f ;%s;%s;%s;%s;%s;%s;%s\n",
+        b += sprintf_s (b, sizeof(b), "%s %5d %3d %5d %5d %s %s %+3.1f ;%s;%s;%s;%s;%s;%s;%s\n",
             leg_mode, leg->route, leg->trip, leg->s0, leg->s1, ct0, ct1, delay_min,agency_name, short_name, headsign, productcategory, s0_id, s1_id,
             (alert_msg ? alert_msg : ""));
 
@@ -1067,7 +1069,7 @@ void router_state_dump (router_state_t *state) {
    Returns a boolean value indicating whether the request was successfully reversed. 
 */
 bool router_request_reverse(router_t *router, router_request_t *req) {
-    router_state_t (*states)[router->tdata->n_stops] = (router_state_t(*)[]) (router->states);
+    router_state_t (*states) = (router_state_t(*)[]) (router->states);
     uint32_t stop = (req->arrive_by ? req->from : req->to);
     uint32_t max_transfers = req->max_transfers;
 	uint32_t round = NONE;
@@ -1076,7 +1078,7 @@ bool router_request_reverse(router_t *router, router_request_t *req) {
     // find the solution with the most transfers and the earliest arrival
     
     for (uint32_t r = 0; r <= max_transfers; ++r) {
-        if (states[r][stop].walk_time != UNREACHED) {
+		if (states[(r * router->tdata->n_stops) + stop].walk_time != UNREACHED) {
             round = r;
             if (req->optimise == o_transfers) break; // use the lowest rather than highest number of transfers
         }
@@ -1087,7 +1089,7 @@ bool router_request_reverse(router_t *router, router_request_t *req) {
     //router_state_dump (&(states[round][stop]));
     req->max_transfers = round;
     req->time_cutoff = req->time;
-    req->time = states[round][stop].walk_time;
+	req->time = states[(round * router->tdata->n_stops) + stop].walk_time;
     req->arrive_by = !(req->arrive_by);
     // router_request_dump(router, req);
     // range-check the resulting request here?

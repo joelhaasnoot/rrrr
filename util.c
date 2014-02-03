@@ -42,7 +42,7 @@ char *btimetext(rtime_t rt, char *buf) {
     uint32_t m = t / 60;
     uint32_t h = m / 60;
     m = m % 60;
-    sprintf(buf, "%02d:%02d:%02d%s", h, m, s, day);
+    sprintf_s(buf, sizeof(buf), "%02d:%02d:%02d%s", h, m, s, day);
     return buf;
 }
 
