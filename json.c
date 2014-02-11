@@ -36,7 +36,7 @@ static void comma() { if (in_list) check(','); }
 /* Write a string out to the buffer, surrounding it in quotes and escaping all quotes or slashes. */
 static void string (const char *s) {
     if (s == NULL) {
-        if (remaining(4)) b += sprintf(b, "null");
+        if (remaining(4)) b += sprintf_s(b, sizeof(b), "null");
         return;
     }
     check('"');
@@ -91,22 +91,22 @@ static void json_kv(char *key, char *value) {
 
 static void json_kd(char *key, int value) {
     ekey(key);
-    if (remaining(11)) b += sprintf(b, "%d", value);
+	if (remaining(11)) b += sprintf_s(b, sizeof(b), "%d", value);
 }
 
 static void json_kf(char *key, double value) {
     ekey(key);
-    if (remaining(12)) b += sprintf(b, "%5.5f", value);
+    if (remaining(12)) b += sprintf_s(b, sizeof(b), "%5.5f", value);
 }
 
 static void json_kl(char *key, int64_t value) {
     ekey(key);
-    if (remaining(21)) b += sprintf(b, "%" PRId64 , value);
+	if (remaining(21)) b += sprintf_s(b, sizeof(b), "%10lld", (long long)value);
 }
 
 static void json_kb(char *key, bool value) {
     ekey(key);
-    if (remaining(5)) b += sprintf(b, value ? "true" : "false");
+	if (remaining(5)) b += sprintf_s(b, sizeof(b), value ? "true" : "false");
 }
 
 static void json_key_obj(char *key) {
@@ -203,7 +203,7 @@ static void json_leg (struct leg *leg, tdata_t *tdata, router_request_t *req, ti
         agency_name = tdata_agency_name_for_route(tdata, leg->route);
         agency_url = tdata_agency_url_for_route(tdata, leg->route);
         trip_id = tdata_trip_id_for_route_trip_index(tdata, leg->route, leg->trip);
-        trip_attributes = tdata_trip_attributes_for_route(tdata, leg->route)[leg->trip];
+        // trip_attributes = tdata_trip_attributes_for_route(tdata, leg->route)[leg->trip];
         rtime_t begin_time = tdata->trips[tdata->routes[leg->route].trip_ids_offset + leg->trip].begin_time;
 
         struct tm ltm;
@@ -371,7 +371,7 @@ static void json_itinerary (struct itinerary *itin, tdata_t *tdata, router_reque
                         waitingtime += leg_duration;
                     } else {
                         uint32_t distance_add = transfer_distance (tdata, leg->s0, leg->s1);
-                        assert(distance_add != UNREACHED);
+//                        assert(distance_add != UNREACHED);
                         walktime += leg_duration;
                         walkdistance += distance_add;
                     }
@@ -413,16 +413,16 @@ uint32_t render_plan_json(struct plan *plan, tdata_t *tdata, char *buf, uint32_t
                 char modes[67]; // max length is 58 + 4 + 8 = 70, minus shortest (3 + 1) + 1
                 char *dst = modes;
 
-                if ((plan->req.mode & m_tram)      == m_tram)      dst = strcpy(dst, "TRAM,");
-                if ((plan->req.mode & m_subway)    == m_subway)    dst = strcpy(dst, "SUBWAY,");
-                if ((plan->req.mode & m_rail)      == m_rail)      dst = strcpy(dst, "RAIL,");
-                if ((plan->req.mode & m_bus)       == m_bus)       dst = strcpy(dst, "BUS,");
-                if ((plan->req.mode & m_ferry)     == m_ferry)     dst = strcpy(dst, "FERRY,");
-                if ((plan->req.mode & m_cablecar)  == m_cablecar)  dst = strcpy(dst, "CABLE_CAR,");
-                if ((plan->req.mode & m_gondola)   == m_gondola)   dst = strcpy(dst, "GONDOLA,");
-                if ((plan->req.mode & m_funicular) == m_funicular) dst = strcpy(dst, "FUNICULAR,");
+                if ((plan->req.mode & m_tram)      == m_tram)      strcpy_s(dst, sizeof(dst), "TRAM,");
+				if ((plan->req.mode & m_subway) == m_subway)    strcpy_s(dst, sizeof(dst), "SUBWAY,");
+				if ((plan->req.mode & m_rail) == m_rail)      strcpy_s(dst, sizeof(dst), "RAIL,");
+				if ((plan->req.mode & m_bus) == m_bus)       strcpy_s(dst, sizeof(dst), "BUS,");
+				if ((plan->req.mode & m_ferry) == m_ferry)     strcpy_s(dst, sizeof(dst), "FERRY,");
+				if ((plan->req.mode & m_cablecar) == m_cablecar)  strcpy_s(dst, sizeof(dst), "CABLE_CAR,");
+				if ((plan->req.mode & m_gondola) == m_gondola)   strcpy_s(dst, sizeof(dst), "GONDOLA,");
+				if ((plan->req.mode & m_funicular) == m_funicular) strcpy_s(dst, sizeof(dst), "FUNICULAR,");
 
-                dst = strcpy(dst, "WALK");
+                strcpy_s(dst, sizeof(dst), "WALK");
 
                 json_kv("mode", modes);
             }

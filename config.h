@@ -1,6 +1,7 @@
 /* Copyright 2013 Bliksem Labs. See the LICENSE file at the top-level directory of this distribution and at https://github.com/bliksemlabs/rrrr/. */
 
 /* config.h */
+#define _ARM_
 
 #define RRRR_TEST_CONCURRENCY 4
 #define RRRR_INPUT_FILE "timetable.dat"

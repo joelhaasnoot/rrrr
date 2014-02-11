@@ -4,6 +4,7 @@
 #include "geometry.h"
 
 #include "config.h"
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdio.h>
 
@@ -18,25 +19,25 @@
 // Must be scaled according to latitude for use in the longitude direction.
 #define METERS_PER_DEGREE_LAT (EARTH_CIRCUMFERENCE / 360.0)
 
-static inline double radians (double degrees) {
+static double radians (double degrees) {
     return degrees * M_PI / 180;
 }
 
-static inline double degrees (double radians) {
+static double degrees (double radians) {
     return radians * 180 / M_PI;
 }
 
 // Sinusoidal / equirectangular projection.
 // Replace with fast estimation polynomial.
-static inline double xscale_at_y (uint32_t y_brads) {
+static double xscale_at_y (uint32_t y_brads) {
     return cos(y_brads * M_PI * 2 / UINT32_MAX);
 }
 
-static inline double xscale_at_lat (double latitude) {
+static double xscale_at_lat (double latitude) {
     return cos(radians(latitude));
 }
 
-static inline double coord_diff_meters (int32_t o1, int32_t o2) {
+static double coord_diff_meters (int32_t o1, int32_t o2) {
      return (o2 - o1) * METERS_PER_BRAD;
 }
 

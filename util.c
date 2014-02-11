@@ -20,11 +20,12 @@ static char buf[32];
 
 // buffer should always be at least 13 characters long, including terminating null
 char *btimetext(rtime_t rt, char *buf) {
-    if (rt == UNREACHED) {
+	char *day;
+	uint32_t t, m, s, h;
+	if (rt == UNREACHED) {
         strcpy_s(buf, 8, "   --   ");
         return buf;
     }
-    char *day;
     if (rt >= RTIME_THREE_DAYS) {
         day = " +2D";
         rt -= RTIME_THREE_DAYS;
@@ -37,10 +38,10 @@ char *btimetext(rtime_t rt, char *buf) {
     } else {
         day = " -1D";
     }
-    uint32_t t = RTIME_TO_SEC(rt);
-    uint32_t s = t % 60;
-    uint32_t m = t / 60;
-    uint32_t h = m / 60;
+    t = RTIME_TO_SEC(rt);
+    s = t % 60;
+    m = t / 60;
+    h = m / 60;
     m = m % 60;
     sprintf_s(buf, sizeof(buf), "%02d:%02d:%02d%s", h, m, s, day);
     return buf;
@@ -75,6 +76,8 @@ void printBits(size_t const size, void const * const ptr) {
 */
 rtime_t epoch_to_rtime (time_t epochtime, struct tm *tm_out) {
     struct tm ltm;
+	uint32_t seconds;
+	rtime_t rtime;
     if (epochtime < SEC_IN_ONE_DAY) {
         time_t now;
         time(&now);
@@ -94,8 +97,8 @@ rtime_t epoch_to_rtime (time_t epochtime, struct tm *tm_out) {
     if (tm_out != NULL) {
         *tm_out = ltm;
     }
-    uint32_t seconds = (((ltm.tm_hour * 60) + ltm.tm_min) * 60) + ltm.tm_sec;
-    rtime_t rtime = SEC_TO_RTIME(seconds);
+    seconds = (((ltm.tm_hour * 60) + ltm.tm_min) * 60) + ltm.tm_sec;
+    rtime = SEC_TO_RTIME(seconds);
     /* shift rtime to day 1. day 0 is yesterday. */
     rtime += RTIME_ONE_DAY;
     /*

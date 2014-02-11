@@ -2,7 +2,7 @@
 
 /* qstring.c : utility functions for handling cgi query strings */
 #include "qstring.h" 
-#include <stdbool.h>
+#include "stdbool.h"
 #include <stddef.h>
 #include <ctype.h>
 
@@ -35,6 +35,7 @@ static void url_decode (char *buf) {
 /* parse a cgi query string returning one key-value pair at a time */
 bool qstring_next_pair(const char *qstring, char *buf, char **vbuf, uint32_t buflen) {
     static const char *q = NULL;
+	char *eob;
     // set up if not currently working on a qstring
     if (q == NULL) 
         q = qstring; 
@@ -43,7 +44,7 @@ bool qstring_next_pair(const char *qstring, char *buf, char **vbuf, uint32_t buf
         q = NULL; // set internal state (no work in progress)
         return false; // signal this query string is fully parsed
     }
-    char *eob = buf + buflen - 1;
+    eob = buf + buflen - 1;
     *vbuf = buf; // in case there is no '='
     while (*q != '\0') {
         if (buf >= eob) // check for buffer overflow

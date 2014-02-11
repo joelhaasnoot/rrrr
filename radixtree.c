@@ -3,6 +3,7 @@
 /* radixtree.c */
 
 #include "radixtree.h"
+#include "util.h"
 
 /*
     All nodes are identical in size, allowing use with no dynamic allocation (in a contiguous block of memory).
@@ -13,9 +14,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 
 static void die (const char *msg) {
@@ -24,7 +24,7 @@ static void die (const char *msg) {
 }
 
 static struct edge *edge_new () {
-    struct edge *e = malloc(sizeof(struct edge));
+    struct edge *e = (struct edge *) malloc(sizeof(struct edge));
     e->next = NULL;
     e->child = NULL;
     e->value = RADIX_TREE_NONE;
@@ -72,17 +72,19 @@ void rxt_edge_print (struct edge *e) {
 void rxt_insert (struct edge *root, const char *key, uint32_t value) {
     const char *k = key;
     struct edge *e = root;
+	char *p, *n, *o;
     /* Loop over edges labeled to continuation from within nested loops. */
     tail_recurse: while (e != NULL) { 
         if (*k == '\0') {
             fprintf (stderr, "Attempt to insert 0-length string.\n");
             return; // refuse to insert 0-length strings.
         }    
-        char *p = e->prefix;
-        if (*p == '\0') {
+        p = e->prefix;
+        if (p == '\0') {
             // Case 1: We have key characters and a fresh (empty) edge for use (whose next pointer should also be NULL).
             // This section is hit whenever we have an empty tree, add a new edge to an edge list, or add a new level to the tree.
-            for (int i = 0; i < RADIX_TREE_PREFIX_SIZE; ++i, ++k, ++p) {
+			int i;
+			for (i = 0; i < RADIX_TREE_PREFIX_SIZE; ++i, ++k, ++p) {
                 *p = *k; // copy up to RADIX_TREE_PREFIX_SIZE characters into this edge's prefix
                 if (*k == '\0') break; // note we have copied the 0 byte to indicate the prefix is shorter than RADIX_TREE_PREFIX_SIZE
             }
@@ -100,20 +102,21 @@ void rxt_insert (struct edge *root, const char *key, uint32_t value) {
         }
         if (*k == *p) { 
             // Case 2: This edge matches the key at least partially, consume some characters.
-            for (int i = 0; i < RADIX_TREE_PREFIX_SIZE; ++i, ++k, ++p) {
+			int i, j;
+            for (i = 0; i < RADIX_TREE_PREFIX_SIZE; ++i, ++k, ++p) {
                 if (*p == '\0') break; // whole prefix was consumed
                 if (*k != *p) {
                     // Key is not in tree but partially matches an edge. Must split the edge.
                     /* Might be nice to somehow pull this out of the for loop, to avoid goto. Then again purpose of goto is clear. */
-                    struct edge *new = edge_new();
-                    new->value = e->value;
-                    new->child = e->child;
+                    struct edge *newedge = edge_new();
+					newedge->value = e->value;
+					newedge->child = e->child;
                     e->value = RADIX_TREE_NONE;
-                    e->child = new;
+					e->child = newedge;
                     // copy the rest of e's prefix into the new child edge
-                    char *n = new->prefix;
-                    char *o = p;
-                    for (int j = i; j < RADIX_TREE_PREFIX_SIZE && *o != '\0'; ++j) {
+					n = newedge->prefix;
+                    o = p;
+                    for (j = i; j < RADIX_TREE_PREFIX_SIZE && *o != '\0'; ++j) {
                         *(n++) = *(o++);
                     }
                     *n = '\0'; // Child string is known to be less than RADIX_TREE_PREFIX_SIZE in length.
@@ -123,7 +126,7 @@ void rxt_insert (struct edge *root, const char *key, uint32_t value) {
                         e->value = value;
                         return;
                     }
-                    e = new; // Tail-recurse using new edge list to consume remaining characters
+					e = newedge; // Tail-recurse using new edge list to consume remaining characters
                     goto tail_recurse; // A simple 'continue' does not suffice, as this is a nested loop.
                 }
             }
@@ -154,7 +157,8 @@ uint32_t rxt_find (struct edge *root, const char *key) {
     while (e != NULL) {
         const char *p = e->prefix;
         if (*k == *p) { // we have a match, consume some characters
-            for (int i = 0; i < RADIX_TREE_PREFIX_SIZE; ++i, ++k, ++p) {
+			int i;
+            for (i = 0; i < RADIX_TREE_PREFIX_SIZE; ++i, ++k, ++p) {
                 if (*p == '\0') break; // prefix char is 0, reached the end of this edge's prefix string.
                 if (*k != *p) return RADIX_TREE_NONE; // key was not in tree
             }
@@ -176,18 +180,21 @@ struct node *compact (struct edge *root) {
 /* Compresses paths in place. Not well tested, and only seems to remove a few edges from 600k when using numbers. */
 void rxt_compress (struct edge *root) {
     struct edge *e = root;
+	char *c0, *c1;
+	int i, l0, l1;
+	struct edge *new_child;
     if (e == NULL) return;
     while (e->child != NULL && e->child->next == NULL && e->value == RADIX_TREE_NONE) {
-        int l0 = edge_prefix_length(e);
-        int l1 = edge_prefix_length(e->child);
+        l0 = edge_prefix_length(e);
+        l1 = edge_prefix_length(e->child);
         if (l0 + l1 <= RADIX_TREE_PREFIX_SIZE) {
             printf ("compressing %.*s and %.*s.\n", RADIX_TREE_PREFIX_SIZE, e->prefix, RADIX_TREE_PREFIX_SIZE, e->child->prefix);
-            char *c0 = e->prefix + l0;
-            char *c1 = e->child->prefix;
-            for (int i = 0; i < l1; ++i) *(c0++) = *(c1++);
+            c0 = e->prefix + l0;
+            c1 = e->child->prefix;
+            for (i = 0; i < l1; ++i) *(c0++) = *(c1++);
             if (l0 + l1 < RADIX_TREE_PREFIX_SIZE) *c0 = '\0';
             e->value = e->child->value;
-            struct edge *new_child = e->child->child;
+            new_child = e->child->child;
             free (e->child);
             e->child = new_child;
         }
@@ -195,14 +202,14 @@ void rxt_compress (struct edge *root) {
     rxt_compress (e->child);
     rxt_compress (e->next);
 }
-
+#if 0
 RadixTree *rxt_load_strings_from_file (char *filename) {
     RadixTree *root = rxt_new ();
     int fd = open(filename, O_RDONLY);
     if (fd == -1) die("could not find input file.");
     struct stat st;
     if (stat(filename, &st) == -1) die("could not stat input file.");
-    char *strings = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    char *strings = (char *) mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
     char *strings_end = strings + st.st_size;
     char *s = strings;
     uint32_t idx = 0;
@@ -221,6 +228,7 @@ RadixTree *rxt_load_strings_from_file (char *filename) {
     */
     return root;
 }
+#endif
 
 RadixTree *rxt_load_strings_from_tdata (char *strings, uint32_t width, uint32_t length) {
     RadixTree *root = rxt_new ();

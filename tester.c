@@ -2,11 +2,10 @@
 
 /* tester.c : single-theaded test of router for unit tests and debugging */
 
-#include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <getopt.h>
+//#include <getopt.h>
 #include <time.h>
 #include <string.h>
 #include "config.h"
@@ -21,7 +20,7 @@
 
 #define OUTPUT_LEN 8000
 
-static struct option long_options[] = {
+/*static struct option long_options[] = {
     { "arrive",        no_argument, NULL, 'a' },
     { "depart",        no_argument, NULL, 'd' },
     { "random",        no_argument, NULL, 'r' },
@@ -44,8 +43,8 @@ static struct option long_options[] = {
     { "gtfsrt-alerts", required_argument, NULL, 'G' },
     { "timetable",     required_argument, NULL, 'T' },
     { "verbose",     no_argument, NULL, 'v' },
-    { NULL, 0, 0, 0 } /* end */
-};
+    { NULL, 0, 0, 0 } end 
+};*/
 
 int main(int argc, char **argv) {
 
